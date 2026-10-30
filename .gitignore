@@ -1,2 +1,2 @@
-datasets
-.venv
+datasets/
+download_report.jsonl
