@@ -1,0 +1,146 @@
+FUNCTION DOWNLOAD_YOUTUBE_VIDEOS(inputs):
+
+    CONVERT relative paths into absolute paths
+    CREATE output directories IF they do not already exist
+
+    SAVE allowed video and subtitle extensions as sets
+    CONFIGURE youtube video downloader options
+
+    OPEN report file in append mode
+
+        INITIALIZE downloader
+
+            FOR each URL in inputs:
+
+                CLEAN URL
+
+                IF URL is empty OR starts with "#":
+                    CONTINUE
+
+                EXTRACT video ID
+
+                INITIALIZE report record with status = FAILED
+
+
+                TRY:
+                    VALIDATE video ID
+
+                    CHECK video directory for existing video files matching the video ID
+                    CHECK subtitle directory for existing subtitle files matching the video ID
+
+                    IF video files AND subtitle files already exist:
+
+                        REUSE existing video and subtitle files
+
+                    ELSE:
+
+                        SET skip_download = TRUE IF video already exists
+
+                        TRY:
+                            DOWNLOAD missing video and/or subtitles
+                        
+                        FINALLY:    
+                            RESET skip_download option
+                        
+                        VALIDATE download info to check if video information was returned
+
+                        RETRIEVE actual downloaded video ID
+
+                        CHECK video directory for video files matching the actual video ID
+                        CHECK subtitle directory for subtitle files matching the actual video ID
+
+                    VALIDATE that at least one video file exists
+
+                    IF subtitle files exist:
+
+                        UPDATE report record:
+                            status = COMPLETE
+
+                    ELSE:
+
+                        UPDATE report record:
+                            status = VIDEO_ONLY
+                            error = NO matching subtitle file found
+
+                    UPDATE report record:
+                        video_files = detected video files
+                        subtitle_files = detected subtitle files
+
+                CATCH error:
+
+                    UPDATE report record:
+                        status = FAILED
+                        error = error message
+
+                WRITE report record to JSONL file
+                FLUSH report file
+
+                IF verbose mode:
+                    PRINT download status and number of subtitle files
+
+
+    RETURN report file path
+
+    
+===============================================================================================================
+
+
+
+INITIALIZE_YDL()
+       |
+       +---- Main video downloader
+       |
+       +---- Subtitle-only downloader
+                    |
+                    +---- skip_download = TRUE
+
+
+CHECK_EXISTING_FILES()
+       |
+       +---- FILE_EXISTS(video directory)
+       |
+       +---- FILE_EXISTS(subtitle directory)
+
+
+DOWNLOAD_MANUAL_SUBTITLES()
+       |
+       +---- INITIALIZE_YDL()
+       +---- DOWNLOAD all manual subtitles
+       +---- CHECK_EXISTING_FILES()
+       +---- RETURN subtitle availability
+
+
+REMOVE_VIDEO_FILES()
+       |
+       +---- DELETE matching video files
+
+
+DOWNLOAD_YOUTUBE_VIDEOS()
+       |
+       +---- Prepare directories
+       +---- Initialise statistics
+       +---- Initialise downloader
+       |
+       +---- FOR each URL:
+                    |
+                    +---- Check existing files
+                    |
+                    +---- Download missing video
+                    |
+                    +---- Check downloaded files
+                    |
+                    +---- IF subtitles missing:
+                    |          |
+                    |          +---- Retry manual subtitles
+                    |          |
+                    |          +---- IF retry fails:
+                    |          |         REMOVE video
+                    |          |
+                    |          +---- ELSE:
+                    |                    KEEP video
+                    |
+                    +---- Update statistics
+                    +---- Update progress bar
+       |
+       +---- PRINT final statistics
+       +---- RETURN statistics
